@@ -284,7 +284,7 @@ def train(hyp, opt, device):
 
     # ============================================== 4、数据加载 ===============================================
     # Trainloader
-    dataloader, dataset = create_dataloader(train_path, imgsz, batch_size // WORLD_SIZE, gs, single_cls,
+    dataloader, dataset = create_dataloader(train_path, imgsz, batch_size // WORLD_SIZE, stride=gs, single_cls=single_cls,
                                             hyp=hyp, augment=True, cache=opt.cache_images, rect=opt.rect,
                                             rank=RANK, workers=workers, image_weights=opt.image_weights,
                                             quad=opt.quad, prefix=colorstr('train: '))
@@ -897,3 +897,4 @@ def run(**kwargs):
 if __name__ == "__main__":
     opt = parse_opt()
     main(opt)
+    # zc home
