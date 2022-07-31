@@ -27,20 +27,20 @@ FILE = Path(__file__).absolute()  # FILE = WindowsPath 'F:\yolo_v5\yolov5-U\trai
 # 将'F:/yolo_v5/yolov5-U'加入系统的环境变量  该脚本结束后失效
 sys.path.append(FILE.parents[0].as_posix())  # add yolov5/ to path
 
-# import val  # for end-of-epoch mAP
-# from models.experimental import attempt_load
-# from models.yolo import Model
-# from utils.autoanchor import check_anchors
-# from utils.datasets import create_dataloader
-# from utils.general import labels_to_class_weights, increment_path, labels_to_image_weights, init_seeds, \
-#     strip_optimizer, get_latest_run, check_dataset, check_file, check_git_status, check_img_size, \
-#     check_requirements, print_mutation, set_logging, one_cycle, colorstr
-# from utils.google_utils import attempt_download
-# from utils.loss import ComputeLoss
-# from utils.plots import plot_images, plot_labels, plot_results, plot_evolution, plot_lr_scheduler, plot_results_overlay
-# from utils.torch_utils import ModelEMA, select_device, intersect_dicts, torch_distributed_zero_first, de_parallel
-# from utils.wandb_logging.wandb_utils import WandbLogger, check_wandb_resume
-# from utils.metrics import fitness
+import val  # for end-of-epoch mAP
+from models.experimental import attempt_load
+from models.yolo import Model
+from utils.autoanchor import check_anchors
+from utils.datasets import create_dataloader
+from utils.general import labels_to_class_weights, increment_path, labels_to_image_weights, init_seeds, \
+    strip_optimizer, get_latest_run, check_dataset, check_file, check_git_status, check_img_size, \
+    check_requirements, print_mutation, set_logging, one_cycle, colorstr
+from utils.google_utils import attempt_download
+from utils.loss import ComputeLoss
+from utils.plots import plot_images, plot_labels, plot_results, plot_evolution, plot_lr_scheduler, plot_results_overlay
+from utils.torch_utils import ModelEMA, select_device, intersect_dicts, torch_distributed_zero_first, de_parallel
+from utils.wandb_logging.wandb_utils import WandbLogger, check_wandb_resume
+from utils.metrics import fitness
 
 # 初始化日志模块
 logger = logging.getLogger(__name__)
@@ -50,8 +50,6 @@ logger = logging.getLogger(__name__)
 LOCAL_RANK = int(os.getenv('LOCAL_RANK', -1))  # 这个 Worker 是这台机器上的第几个 Worker
 RANK = int(os.getenv('RANK', -1))              # 这个 Worker 是全局第几个 Worker
 WORLD_SIZE = int(os.getenv('WORLD_SIZE', 1))   # 总共有几个 Worker
-
-
 
 def parse_opt(known=False):
     """
@@ -137,7 +135,6 @@ def parse_opt(known=False):
     opt = parser.parse_known_args()[0] if known else parser.parse_args()
     return opt
 
-
 def train(hyp, opt, device):
     """
     :params hyp: data/hyps/hyp.scratch.yaml   hyp dictionary
@@ -162,11 +159,10 @@ def train(hyp, opt, device):
     # Hyperparameters超参
     if isinstance(hyp, str):
         with open(hyp, encoding='utf-8') as f:
-            hyp = yaml.safe_load(f)  # load hyps dict  加载超参信息
-    # 日志输出超参信息 hyperparameters: ...
+            hyp = yaml.safe_load(f)
+
     logger.info(colorstr('hyperparameters: ') + ', '.join(f'{k}={v}' for k, v in hyp.items()))
 
-    # Save run settings
     with open(save_dir / 'hyp.yaml', 'w') as f:
         yaml.safe_dump(hyp, f, sort_keys=False)
 
@@ -204,8 +200,7 @@ def train(hyp, opt, device):
             data_dict = wandb_logger.data_dict
             weights, epochs, hyp = opt.weights, opt.epochs, opt.hyp  # may update weights, epochs if resuming
 
-    # nc: number of classes  数据集有多少种类别
-    nc = 1 if single_cls else int(data_dict['nc'])
+    nc = 1 if single_cls else int(data_dict['nc'])  # nc: number of classes
     # names: 数据集所有类别的名字
     names = ['item'] if single_cls and len(data_dict['names']) != 1 else data_dict['names']  # class names
     assert len(names) == nc, '%g names found for nc=%g dataset in %s' % (len(names), nc, data)  # check
@@ -213,7 +208,6 @@ def train(hyp, opt, device):
     is_coco = data.endswith('coco.yaml') and nc == 80  # COCO dataset
 
     # ============================================== 1、model =================================================
-    # 载入模型
     pretrained = weights.endswith('.pt')
     if pretrained:
         # 使用预训练
@@ -221,9 +215,7 @@ def train(hyp, opt, device):
         with torch_distributed_zero_first(RANK):
             # 这里下载是去google云盘下载, 一般会下载失败,所以建议自行去github中下载再放到weights下
             weights = attempt_download(weights)  # download if not found locally
-        # 加载模型及参数
         ckpt = torch.load(weights, map_location=device)  # load checkpoint
-        # ？？？？
         # 这里加载模型有两种方式，一种是通过opt.cfg 另一种是通过ckpt['model'].yaml
         # 区别在于是否使用resume 如果使用resume会将opt.cfg设为空，按照ckpt['model'].yaml来创建模型
         # 这也影响了下面是否除去anchor的key(也就是不加载anchor), 如果resume则不加载anchor
@@ -243,14 +235,13 @@ def train(hyp, opt, device):
 
     # 检查数据集 如果本地没有则从torch库中下载并解压数据集
     with torch_distributed_zero_first(RANK):
+        print('检擦数据集')
         check_dataset(data_dict)  # check
 
     # 数据集路径参数
-    train_path = data_dict['train']
-    test_path = data_dict['val']
+    train_path, test_path = data_dict['train'], data_dict['val']
 
-    # 冻结权重层
-    # 这里只是给了冻结权重层的一个例子, 但是作者并不建议冻结权重层, 训练全部层参数, 可以得到更好的性能, 当然也会更慢
+    # 冻结权重层，这里只是给了冻结权重层的一个例子, 但是作者并不建议冻结权重层, 训练全部层参数, 可以得到更好的性能, 当然也会更慢
     freeze = []  # parameter names to freeze (full or partial)
     for k, v in model.named_parameters():
         v.requires_grad = True  # train all layers

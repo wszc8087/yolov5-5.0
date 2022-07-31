@@ -65,8 +65,7 @@ def train(hyp, opt, device):
     :params device: 当前设备
     """
     # ----------------------------------------------- 初始化参数和配置信息 ----------------------------------------------
-    # 设置一系列的随机数种子
-    init_seeds(1 + RANK)
+    init_seeds(1 + RANK)  # 设置一系列的随机数种子
 
     save_dir, epochs, batch_size, weights, single_cls, evolve, data, cfg, resume, notest, nosave, workers, = \
         opt.save_dir, opt.epochs, opt.batch_size, opt.weights, opt.single_cls, opt.evolve, opt.data, opt.cfg, \
@@ -74,39 +73,34 @@ def train(hyp, opt, device):
 
     save_dir = Path(save_dir)  # 保存训练结果的目录  如runs/train/exp18
     wdir = save_dir / 'weights'  # 保存权重路径 如runs/train/exp18/weights
-    wdir.mkdir(parents=True, exist_ok=True)  # make dir
-    last = wdir / 'last.pt'  # runs/train/exp18/weights/last.pt
-    best = wdir / 'best.pt'  # runs/train/exp18/weights/best.pt
-    results_file = save_dir / 'results.txt'  # runs/train/exp18/results.txt
+    wdir.mkdir(parents=True, exist_ok=True)
+    last, best, results_file= wdir / 'last.pt', wdir / 'best.pt', save_dir / 'results.txt'
+    # runs/train/exp18/weights/last.pt # runs/train/exp18/weights/best.pt # runs/train/exp18/results.txt
 
-    # Hyperparameters超参
+    # Hyperparameters
     if isinstance(hyp, str):
         with open(hyp, encoding='utf-8') as f:
-            hyp = yaml.safe_load(f)  # load hyps dict  加载超参信息
-    # 日志输出超参信息 hyperparameters: ...
+            hyp = yaml.safe_load(f)
     logger.info(colorstr('hyperparameters: ') + ', '.join(f'{k}={v}' for k, v in hyp.items()))
 
     # Save run settings
     with open(save_dir / 'hyp.yaml', 'w') as f:
         yaml.safe_dump(hyp, f, sort_keys=False)
-
-    # 保存opt
+    #
     with open(save_dir / 'opt.yaml', 'w') as f:
         yaml.safe_dump(vars(opt), f, sort_keys=False)
-
     # Configure
     # 是否需要画图: 所有的labels信息、前三次迭代的barch、训练结果等
     plots = not evolve  # create plots
     cuda = device.type != 'cpu'
-
     # data_dict: 加载VOC.yaml中的数据配置信息  dict
-    with open(data,encoding='utf-8') as f:
-        data_dict = yaml.safe_load(f)  # data dict
+    with open(data, encoding='utf-8') as f:
+        data_dict = yaml.safe_load(f)
     # with open(cfg, encoding='utf-8') as f:
     #     # model dict  取到配置文件中每条的信息（没有注释内容）
     #     self.yaml = yaml.safe_load(f)
-    # Loggers
-    loggers = {'wandb': None, 'tb': None}  # loggers dict
+
+    loggers = {'wandb': None, 'tb': None}
     if RANK in [-1, 0]:
         # TensorBoard
         if not evolve:
@@ -124,7 +118,7 @@ def train(hyp, opt, device):
             data_dict = wandb_logger.data_dict
             weights, epochs, hyp = opt.weights, opt.epochs, opt.hyp  # may update weights, epochs if resuming
 
-    # nc: number of classes  数据集有多少种类别
+    # nc: number of classes
     nc = 1 if single_cls else int(data_dict['nc'])
     # names: 数据集所有类别的名字
     names = ['item'] if single_cls and len(data_dict['names']) != 1 else data_dict['names']  # class names
@@ -136,14 +130,13 @@ def train(hyp, opt, device):
     # 载入模型
     pretrained = weights.endswith('.pt')
     if pretrained:
-        # 使用预训练
-        # torch_distributed_zero_first(RANK): 用于同步不同进程对数据读取的上下文管理器
+        # 使用预训练 torch_distributed_zero_first(RANK): 用于同步不同进程对数据读取的上下文管理器
         with torch_distributed_zero_first(RANK):
             # 这里下载是去google云盘下载, 一般会下载失败,所以建议自行去github中下载再放到weights下
-            weights = attempt_download(weights)  # download if not found locally
+            weights = attempt_download(weights)
         # 加载模型及参数
         ckpt = torch.load(weights, map_location=device)  # load checkpoint
-        # ？？？？
+
         # 这里加载模型有两种方式，一种是通过opt.cfg 另一种是通过ckpt['model'].yaml
         # 区别在于是否使用resume 如果使用resume会将opt.cfg设为空，按照ckpt['model'].yaml来创建模型
         # 这也影响了下面是否除去anchor的key(也就是不加载anchor), 如果resume则不加载anchor

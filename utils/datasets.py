@@ -90,14 +90,12 @@ def create_dataloader(path, imgsz, batch_size, stride, single_cls=False,
     :param quad: dataloader取数据时, 是否使用collate_fn4代替collate_fn  默认False
     :param prefix: 显示信息   一个标志，多为train/val，处理标签时保存cache文件会用到
     """
-    # Make sure only the first process in DDP process the dataset first, and the following others can use the cache
     # 主进程实现数据的预读取并缓存，然后其它子进程则从缓存中读取数据并进行一系列运算。
     # 为了完成数据的正常同步, yolov5基于torch.distributed.barrier()函数实现了上下文管理器
     with torch_distributed_zero_first(rank):
-        # 载入文件数据(增强数据集)
         dataset = LoadImagesAndLabels(path, imgsz, batch_size,
-                                      augment=augment,  # augment images
-                                      hyp=hyp,  # augmentation hyperparameters
+                                      augment=augment,
+                                      hyp=hyp,
                                       rect=rect,  # rectangular training
                                       cache_images=cache,
                                       single_cls=single_cls,
@@ -192,9 +190,7 @@ class LoadImagesAndLabels(Dataset):
             f = []  # image files
             for p in path if isinstance(path, list) else [path]:
                 # 获取数据集路径path，包含图片路径的txt文件或者包含图片的文件夹路径
-                # 使用pathlib.Path生成与操作系统无关的路径，因为不同操作系统路径的‘/’会有所不同
-                p = Path(p)  # os-agnostic
-                # 如果路径path为包含图片的文件夹路径
+                p = Path(p)
                 if p.is_dir():  # dir
                     # glob.glab: 返回所有匹配的文件路径列表  递归获取p路径下所有文件
                     f += glob.glob(str(p / '**' / '*.*'), recursive=True)
@@ -506,7 +502,7 @@ class LoadImagesAndLabels(Dataset):
         if self.augment:
             # 随机上下翻转 flip up-down
             if random.random() < hyp['flipud']:
-                img = np.flipud(img)  # np.flipud 将数组在上下方向翻转。
+                img = np.flipud(img)  # np.flipud 将数组在上下方向翻转
                 if nL:
                     labels[:, 2] = 1 - labels[:, 2]   # 1 - y_center  label也要映射
 
@@ -600,7 +596,6 @@ class LoadImagesAndLabels(Dataset):
 def img2label_paths(img_paths):
     """用在LoadImagesAndLabels模块的__init__函数中
     根据imgs图片的路径找到对应labels的路径
-    Define label paths as a function of image paths
     :params img_paths: {list: 50}  整个数据集的图片相对路径  例如: '..\\datasets\\VOC\\images\\train2007\\000012.jpg'
                                                         =>   '..\\datasets\\VOC\\labels\\train2007\\000012.jpg'
     """
@@ -1664,6 +1659,82 @@ def dataset_stats(path='../data/coco128.yaml', autodownload=False, verbose=False
         # print(yaml.dump([stats], sort_keys=False, default_flow_style=False))
     return stats
 
+def colorstr(*input):
+    """用到下面的check_git_status、check_requirements等函数  train.py、val.py、detect.py等文件中
+    把输出的开头和结尾加上颜色  命令行输出显示会更加好看  如: colorstr('blue', 'hello world')
+    Colors a string https://en.wikipedia.org/wiki/ANSI_escape_code
+    """
+    # 如果输入长度为1, 就是没有选择颜色 则选择默认颜色设置 blue + bold
+    # args: 输入的颜色序列 string: 输入的字符串
+    *args, string = input if len(input) > 1 else ('blue', 'bold', input[0])
+    # 定义一些基础的颜色 和 字体设置
+    colors = {'black': '\033[30m',  # basic colors
+              'red': '\033[31m',
+              'green': '\033[32m',
+              'yellow': '\033[33m',
+              'blue': '\033[34m',
+              'magenta': '\033[35m',
+              'cyan': '\033[36m',
+              'white': '\033[37m',
+              'bright_black': '\033[90m',  # bright colors
+              'bright_red': '\033[91m',
+              'bright_green': '\033[92m',
+              'bright_yellow': '\033[93m',
+              'bright_blue': '\033[94m',
+              'bright_magenta': '\033[95m',
+              'bright_cyan': '\033[96m',
+              'bright_white': '\033[97m',
+              'end': '\033[0m',  # misc
+              'bold': '\033[1m',
+              'underline': '\033[4m'}
+    # 把输出的开头和结尾加上颜色  命令行输出显示会更加好看
+    return ''.join(colors[x] for x in args) + f'{string}' + colors['end']
+
+if __name__ =="__main__":
+    data = '../data/coco128.yaml'# opt.data
+    # data_dict: 加载VOC.yaml中的数据配置信息  dict
+    with open(data,encoding='utf-8') as f:
+        data_dict = yaml.safe_load(f)  # data dict
+
+    # 检查数据集 如果本地没有则从torch库中下载并解压数据集
+    # with torch_distributed_zero_first(RANK):
+    #check_dataset(data_dict)  # check
+    # train_path = data_dict['train']
+    train_path ="../../datasets/coco128/images/train2017"
+    imgsz= 640
+    batch_size = 32
+    WORLD_SIZE =1
+    gs = False
+    single_cls = False
+    hyp ='../data/hyps/hyp.scratch.yaml'
+    with open(hyp,encoding="utf-8") as f:
+        hyp = yaml.safe_load(f)  # 载入初始超参
+    dataloader, dataset = create_dataloader(train_path, imgsz, batch_size // WORLD_SIZE, stride=32,
+                                            single_cls=single_cls,
+                                            hyp=hyp, augment=True, cache=False, rect=False,
+                                            rank=-1, workers=9, image_weights=True,
+                                            quad=False, prefix=colorstr('train: '))
 
 
+    for i, (imgs, targets, paths, _) in enumerate(dataloader):
+
+        # cv2.imshow("mosaic", imgs)
+        # cv2.waitKey(0)
+        # cv2.destroyAllWindows()
+        # print(imgs.shape)  # (1280, 1280, 3)
+
+        print(imgs.shape)  # 32 3 640 640\
+        #img4 = np.full((s * 2, s * 2, img.shape[2]), 114, dtype=np.uint8)  # base image with 4 tiles
+        for j in range(imgs.shape[0]):
+            print(imgs[j])
+            img = np.array((imgs[j]),dtype=np.uint8).transpose(1, 2, 0)
+            print(img.shape)
+            cv2.imshow("mosaic", img)
+            cv2.waitKey(0)
+            cv2.destroyAllWindows()
+            print(imgs.shape)  # (1280, 1280, 3)
+        print("i:",i)
+
+        print("Doneaaa")
+#96
 

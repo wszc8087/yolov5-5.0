@@ -43,7 +43,6 @@ def parse_model(d, ch):  # model_dict, input_channels(3)
     :return sorted(save): 把所有层结构中from不是-1的值记下 并排序 [4, 6, 10, 14, 17, 20, 23]
     """
     logger.info('\n%3s%18s%3s%10s  %-40s%-30s' % ('', 'from', 'n', 'params', 'module', 'arguments'))
-    # 读取d字典中的anchors和parameters(nc、depth_multiple、width_multiple)
     anchors, nc, gd, gw = d['anchors'], d['nc'], d['depth_multiple'], d['width_multiple']
     # na: number of anchors 每一个predict head上的anchor数 = 3
     na = (len(anchors[0]) // 2) if isinstance(anchors, list) else anchors
@@ -79,7 +78,7 @@ def parse_model(d, ch):  # model_dict, input_channels(3)
                 c2 = make_divisible(c2 * gw, 8)
 
             # 在初始arg的基础上更新 加入当前层的输入channel并更新当前层
-            # [in_channel, out_channel, *args[1:]]
+            # [in_channel, out_channel, *args[1:]] #
             args = [c1, c2, *args[1:]]
             # 如果当前层是BottleneckCSP/C3/C3TR, 则需要在args中加入bottleneck的个数
             # [in_channel, out_channel, Bottleneck的个数n, bool(True表示有shortcut 默认，反之无)]
@@ -222,7 +221,7 @@ class Model(nn.Module):
         :anchors: 一般是None
         """
         super(Model, self).__init__()
-        if isinstance(cfg, dict):
+        if isinstance(cfg, dict):   # 读取 torch.load(.pth)['model'].yaml
             self.yaml = cfg  # model dict
         else:
             # is *.yaml  一般执行这里
@@ -230,13 +229,12 @@ class Model(nn.Module):
             self.yaml_file = Path(cfg).name  # cfg file name = yolov5s.yaml
             # 如果配置文件中有中文，打开时要加encoding参数
             with open(cfg, encoding='utf-8') as f:
-                # model dict  取到配置文件中每条的信息（没有注释内容）
-                self.yaml = yaml.safe_load(f)
+                self.yaml = yaml.safe_load(f)  # model dict  取到配置文件中每条的信息（没有注释内容）
 
         # input channels  ch=3
-        ch = self.yaml['ch'] = self.yaml.get('ch', ch)
-        # 设置类别数 一般不执行, 因为nc=self.yaml['nc']恒成立
-        if nc and nc != self.yaml['nc']:
+        ch =self.yaml['ch'] = self.yaml.get('ch', ch)
+
+        if nc and nc != self.yaml['nc']:  # 设置类别数 一般不执行, 因为nc=self.yaml['nc']恒成立
             logger.info(f"Overriding model.yaml nc={self.yaml['nc']} with nc={nc}")
             self.yaml['nc'] = nc  # override yaml value
         # 重写anchor，一般不执行, 因为传进来的anchors一般都是None
@@ -473,15 +471,54 @@ if __name__ == '__main__':
     set_logging()
     device = select_device(opt.device)
 
+    # ----------------------------打印模型参数------------
     # Create model
-    model = Model(opt.cfg).to(device)
-    model.info()
+    #model = Model(opt.cfg).to(device)
+    model = Model(opt.cfg)
+    #print(model.info())
+    #print(model.state_dict())
     a = torch.load(opt.weights)
-    print(a)
-    print(a.keys())
-    model.load_state_dict(torch.load(opt.weights))  # 这里根据模型结构，调用存储的模型参数
+    params = model.state_dict()  # 获得模型的原始状态以及参数。
+    for k, v in params.items():
+        print(k)  # 只打印key值，不打印具体参数。
+    # ----------------------------
 
-    print(1)
+    # ----------------------------读取v5s.pt的文件------------
+    print('--------')
+    checkpoint = torch.load(opt.weights, map_location='cpu')
+    print(type(checkpoint['model']))
+    print((checkpoint['model'].__dict__).keys())
+    #print(checkpoint['model'].yaml)
+    #print(checkpoint.state_dict().keys())
+
+    # model = Model(checkpoint['model'].yaml)
+    # params = model.state_dict()  # 获得模型的原始状态以及参数。
+    # for k, v in params.items():
+    #     print(k)  # 只打印key值，不打印具体参数。
+    #print(checkpoint.parameters())
+    #print(checkpoint.state_dict())
+    # Load weights to resume from checkpoint。
+    # print('**************************************')
+    # 这个方法能够直接打印出你保存的checkpoint的键和值。
+    # for k, v in checkpoint.items():
+    #     print(k)
+# #epoch
+# best_fitness
+# training_results
+# model
+# optimizer
+# wandb_id
+        # model.load_state_dict(torch.load(opt.weights))
+    # print(1)
+
+    # for parameter in a.parameters():
+    #     print(parameter)
+    #print(p)
+    # print(a)
+    # print(a.keys())
+    #model.load_state_dict(torch.load(opt.weights))  # 这里根据模型结构，调用存储的模型参数
+
+    #print(1)
     # # model.train()
     #
     # # Profile
