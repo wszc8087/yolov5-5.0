@@ -1,5 +1,5 @@
 # parameters
-nc: 20  # number of classes
+nc: 80  # number of classes
 depth_multiple: 0.33  # model depth multiple 控制模型的深度（BottleneckCSP个数）
 width_multiple: 0.50  # layer channel multiple 控制Conv通道channel个数（卷积核数量）
 # depth_multiple表示BottleneckCSP模块的缩放因子，将所有BottleneckCSP模块的Bottleneck乘上该参数得到最终个数。
