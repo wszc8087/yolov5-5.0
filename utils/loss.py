@@ -274,7 +274,7 @@ class ComputeLoss:
         :params p: 预测框 由模型构建中的三个检测头Detector返回的三个yolo层的输出
                    tensor格式 list列表 存放三个tensor 对应的是三个yolo层的输出
                    如: [4, 3, 112, 112, 85]、[4, 3, 56, 56, 85]、[4, 3, 28, 28, 85]
-                   [bs, anchor_num, grid_h, grid_w, xywh+class+classes]
+                   [bs, anchor_num, grid_h, grid_w, xywh4+class1+classes80]
                    可以看出来这里的预测值p是三个yolo层每个grid_cell(每个grid_cell有三个预测值)的预测值,后面肯定要进行正样本筛选
         :params targets: 数据增强后的真实框 [63, 6] [num_target,  image_index+class+xywh] xywh为归一化后的框
         :return tcls: 表示这个target所属的class index
